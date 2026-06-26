@@ -4,5 +4,8 @@
   "type": "module",
   "dependencies": {
     "@google/generative-ai": "^0.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
