@@ -1,67 +1,68 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+export default function handler(req, res) {
+  if (req.method === 'GET') {
+    res.status(200).json({ status: 'ok' });
+  } else {
+    res.status(405).json({ error: 'Method not allowed' });
+  }
+}
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Только API ключ и модель из environment
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+module.exports = async (req, res) => {
+  // Разрешаем только POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  // Получаем тело запроса
+  const body = req.body;
+  
+  // Проверяем наличие ключа в переменных окружения
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
+  }
+
+  // Проверяем, что есть messages
+  if (!body.messages || !Array.isArray(body.messages)) {
+    return res.status(400).json({ error: 'messages array required' });
   }
 
   try {
-    if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
-    }
-
-    const { messages, prompt } = req.body;
-
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+    const genAI = new GoogleGenerativeAI(apiKey);
     
-    let result;
-
-    if (messages && Array.isArray(messages)) {
-      // Чат режим
-      const chat = model.startChat({
-        history: messages.slice(0, -1).map(msg => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }]
-        }))
-      });
-
-      const lastMessage = messages[messages.length - 1];
-      result = await chat.sendMessage(lastMessage.content);
-    } else if (prompt) {
-      // Простой режим
-      result = await model.generateContent(prompt);
-    } else {
-      return res.status(400).json({ error: 'Provide messages or prompt' });
+    // Извлекаем последнее сообщение пользователя
+    const userMessages = body.messages.filter(msg => msg.role === 'user');
+    if (userMessages.length === 0) {
+      return res.status(400).json({ error: 'No user message found' });
     }
+    
+    const lastUserMessage = userMessages[userMessages.length - 1].content;
+    
+    // Определяем модель (из запроса или дефолтную)
+    const modelName = body.model || 'gemini-2.0-flash';
+    const model = genAI.getGenerativeModel({ model: modelName });
 
-    const response = result.response;
+    // Отправляем запрос в Gemini
+    const result = await model.generateContent(lastUserMessage);
+    const response = await result.response;
     const text = response.text();
 
+    // Возвращаем в формате, совместимом с OpenAI
     res.status(200).json({
-      success: true,
-      content: text
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: text
+          }
+        }
+      ]
     });
 
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
+    console.error('Gemini API error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Internal server error' 
     });
   }
-}
+};
