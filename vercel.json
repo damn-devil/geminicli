@@ -2,17 +2,7 @@
   "version": 2,
   "functions": {
     "api/gemini.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 10,
-      "memory": 1024
+      "runtime": "nodejs20.x"
     }
-  },
-  "env": {
-    "GEMINI_API_KEY": "@gemini_api_key",
-    "GEMINI_MODEL": "@gemini_model",
-    "GEMINI_TEMPERATURE": "@gemini_temperature",
-    "GEMINI_MAX_TOKENS": "@gemini_max_tokens",
-    "CLIENT_API_KEY": "@client_api_key",
-    "ALLOWED_ORIGINS": "@allowed_origins"
   }
 }
